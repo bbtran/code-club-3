@@ -13,6 +13,16 @@
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
+		console.log('Logging: ', request.url);
+
+		if (request.method == 'POST') {
+			const newResponse = Response.json(
+				{ message: 'Successful POST', foo: 'bar' },
+				{ status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json' } }
+			);
+			return newResponse;
+		} else {
+			return new Response('Hello World!', { status: 200, statusText: 'OK'});
+		}
 	},
 };
