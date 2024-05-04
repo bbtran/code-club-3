@@ -13,7 +13,13 @@
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		console.log('Logging: ', request.url);
+		// console.log('Logging: ', request.url);
+		const randomResponseMap: { [key: string]: string } = {
+			'0': 'Built with Cloudflare Workers (Response #1)',
+			'1': 'Hello World (Response #2)',
+			'2': 'Welcome to Code club! (Response #3)',
+			'3': 'Random Responses (Response #4)',
+		};
 
 		if (request.method == 'POST') {
 			const newResponse = Response.json(
@@ -22,7 +28,12 @@ export default {
 			);
 			return newResponse;
 		} else {
-			return new Response('Hello World!', { status: 200, statusText: 'OK'});
+			const key = getRandomIntString(4);
+			return new Response(randomResponseMap[key], { status: 200, statusText: 'OK' });
 		}
 	},
 };
+
+function getRandomIntString(max: number): string {
+	return Math.floor(Math.random() * max).toString();
+}
