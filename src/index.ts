@@ -11,6 +11,8 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+import { CfProperties, Response } from '@cloudflare/workers-types/experimental';
+
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		// console.log('Logging: ', request.url);
@@ -21,28 +23,31 @@ export default {
 			'3': 'Random Responses (Response #4)',
 		};
 
+		let resp: any = new Response();
 		switch (request.method) {
-			case 'POST': {
+			case 'POST':
 				const newResponse = Response.json(
 					{ message: 'Successful POST', foo: 'bar' },
 					{ status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json' } }
 				);
-				return newResponse;
-			}
-			case 'GET': {
-				const cfObj: IncomingRequestCfProperties = request.cf
+				resp = newResponse;
+				break;
+			case 'GET':
+				// @ts-ignore
+				const cfObj: IncomingRequestCfProperties = request.cf; 
 				const botM: IncomingRequestCfPropertiesBotManagementBase = cfObj.botManagement;
 				const botScore = botM.score;
 				if (botScore < 30) {
-					return await await fetch('https://k8s.benjamintran.com');
+					resp = await await fetch('https://k8s.benjamintran.com');
 				} else {
-					return await fetch(request);
+					resp = await fetch(request);
 				}
-			}
+				break;
 			default:
 				const key = getRandomIntString(4);
 				return new Response(randomResponseMap[key], { status: 200, statusText: 'OK' });
 		}
+		return resp;
 	},
 };
 
