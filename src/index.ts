@@ -13,16 +13,39 @@
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		console.log('Logging: ', request.url);
+		// console.log('Logging: ', request.url);
+		const randomResponseMap: { [key: string]: string } = {
+			'0': 'Built with Cloudflare Workers (Response #1)',
+			'1': 'Hello World (Response #2)',
+			'2': 'Welcome to Code club! (Response #3)',
+			'3': 'Random Responses (Response #4)',
+		};
 
-		if (request.method == 'POST') {
-			const newResponse = Response.json(
-				{ message: 'Successful POST', foo: 'bar' },
-				{ status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json' } }
-			);
-			return newResponse;
-		} else {
-			return new Response('Hello World!', { status: 200, statusText: 'OK'});
+		switch (request.method) {
+			case 'POST': {
+				const newResponse = Response.json(
+					{ message: 'Successful POST', foo: 'bar' },
+					{ status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json' } }
+				);
+				return newResponse;
+			}
+			case 'GET': {
+				const cfObj: IncomingRequestCfProperties = request.cf
+				const botM: IncomingRequestCfPropertiesBotManagementBase = cfObj.botManagement;
+				const botScore = botM.score;
+				if (botScore < 30) {
+					return await await fetch('https://k8s.benjamintran.com');
+				} else {
+					return await fetch(request);
+				}
+			}
+			default:
+				const key = getRandomIntString(4);
+				return new Response(randomResponseMap[key], { status: 200, statusText: 'OK' });
 		}
 	},
 };
+
+function getRandomIntString(max: number): string {
+	return Math.floor(Math.random() * max).toString();
+}
