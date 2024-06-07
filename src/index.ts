@@ -131,6 +131,15 @@ async function handleProfileEndpoint(req: Request, env: Env): Promise<Response> 
 async function handlePoemsEndpoint(req: Request, env: Env): Promise<Response> {
 	let resp: any = new Response();
 	const newReq = new Request('https://benjamintran.com');
-	resp = await fetch(newReq);
+
+	const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+		prompt: `Write me a poem using using the following country, region, and city. The country is ${req.cf?.country}, the region is ${req.cf?.region}, and the city is ${req.cf?.city}.`,
+		stream: true,
+	});
+
+	resp = new Response(answer, {
+		headers: { 'content-type': 'text/event-stream' },
+	});
+	
 	return resp;
 }
