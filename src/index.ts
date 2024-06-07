@@ -44,7 +44,19 @@ export default {
 					case 'POST':
 						console.log('POST /profile');
 						console.log('Currently both GET and POST have the same response handler.');
-						resp = await handlerProfileEndpoint(request, env);
+						resp = await handleProfileEndpoint(request, env);
+						break;
+					default:
+						break;
+				}
+				break;
+			case '/poems':
+				switch (request.method) {
+					case 'GET':
+						console.log('GET /poems');
+					case 'POST':
+						console.log('POST /poems');
+						resp = await handlePoemsEndpoint(request, env);
 						break;
 					default:
 						break;
@@ -83,7 +95,7 @@ function getRandomIntString(max: number): string {
 	return Math.floor(Math.random() * max).toString();
 }
 
-async function handlerProfileEndpoint(req: Request, env: Env): Promise<Response> {
+async function handleProfileEndpoint(req: Request, env: Env): Promise<Response> {
 	const userId = req.headers.get('UserID') || '';
 	const authToken = await env.USER_AUTH.get(userId);
 	let resp: any = new Response();
@@ -112,6 +124,13 @@ async function handlerProfileEndpoint(req: Request, env: Env): Promise<Response>
 	console.log(`HashString: ${hashString}`);
 	newReq.headers.set('Auth-Token-SHA-256-B64', btoa(hashString));
 
+	resp = await fetch(newReq);
+	return resp;
+}
+
+async function handlePoemsEndpoint(req: Request, env: Env): Promise<Response> {
+	let resp: any = new Response();
+	const newReq = new Request('https://benjamintran.com');
 	resp = await fetch(newReq);
 	return resp;
 }
