@@ -11,18 +11,97 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+interface Env {
+	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
+	// MY_KV_NAMESPACE: KVNamespace;
+	USER_AUTH: KVNamespace;
+	//
+	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
+	// MY_DURABLE_OBJECT: DurableObjectNamespace;
+	//
+	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
+	// MY_BUCKET: R2Bucket;
+}
+
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		console.log('Logging: ', request.url);
-
-		if (request.method == 'POST') {
-			const newResponse = Response.json(
-				{ message: 'Successful POST', foo: 'bar' },
-				{ status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json' } }
-			);
-			return newResponse;
-		} else {
-			return new Response('Hello World!', { status: 200, statusText: 'OK'});
+		// console.log('Logging: ', request.url);
+		const randomResponseMap: { [key: string]: string } = {
+			'0': 'Built with Cloudflare Workers (Response #1)',
+			'1': 'Hello World (Response #2)',
+			'2': 'Welcome to Code club! (Response #3)',
+			'3': 'Random Responses (Response #4)',
+		};
+		let resp: any = new Response();
+		const requestURL = new URL(request.url);
+		switch (requestURL.pathname) {
+			case '/profile':
+				switch (request.method) {
+					case 'GET':
+						console.log('GET /profile');
+					case 'POST':
+						console.log('POST /profile');
+						console.log('Currently both GET and POST have the same response handler.');
+						resp = await handlerProfileEndpoint(request, env);
+						break;
+					default:
+				}
+			default:
+				switch (request.method) {
+					case 'POST':
+						const newResponse = Response.json(
+							{ message: 'Successful POST', foo: 'bar' },
+							{ status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json' } }
+						);
+						resp = newResponse;
+						break;
+					case 'GET':
+						// @ts-ignore
+						const cfObj: IncomingRequestCfProperties = request.cf;
+						const botM: IncomingRequestCfPropertiesBotManagementBase = cfObj.botManagement;
+						const botScore = botM.score;
+						if (botScore < 30) {
+							resp = await await fetch('https://k8s.benjamintran.com');
+						} else {
+							resp = await fetch(request);
+						}
+						break;
+					default:
+						const key = getRandomIntString(4);
+						return new Response(randomResponseMap[key], { status: 200, statusText: 'OK' });
+				}
 		}
+		return resp;
 	},
 };
+
+function getRandomIntString(max: number): string {
+	return Math.floor(Math.random() * max).toString();
+}
+
+async function handlerProfileEndpoint(req: Request, env: Env): Promise<Response> {
+	const userId = req.headers.get('UserID') || '';
+	const authToken = await env.USER_AUTH.get(userId);
+	let resp: any = new Response();
+	if (!authToken) {
+		const err = new Error(`Unable to fetch auth token for UserID: ${userId}`);
+		resp = new Response(err.message, { status: 404 });
+	}
+	const newReq = new Request('https://benjamintran.com');
+	newReq.headers.set('Auth-Token', <string>authToken);
+
+	// Base64 token
+	const base64Token = btoa(<string>authToken);
+	newReq.headers.set('Auth-Token-Base-64', base64Token);
+
+	// SHA-256
+	const encoder = new TextEncoder();
+	const encodedToken = encoder.encode(<string>authToken);
+	const hash = await crypto.subtle.digest({ name: 'SHA-256' }, encodedToken);
+	const intArray = new Uint8Array(hash);
+	const hashString = String.fromCharCode.apply(null, [...intArray]);
+	newReq.headers.set('Auth-Token-SHA-256', hashString);
+
+	resp = await fetch(newReq);
+	return resp;
+}
