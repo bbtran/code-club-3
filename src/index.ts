@@ -45,7 +45,9 @@ export default {
 						resp = await handlerProfileEndpoint(request, env);
 						break;
 					default:
+						break;
 				}
+				break;
 			default:
 				switch (request.method) {
 					case 'POST':
@@ -59,11 +61,11 @@ export default {
 						// @ts-ignore
 						const cfObj: IncomingRequestCfProperties = request.cf;
 						const botM: IncomingRequestCfPropertiesBotManagementBase = cfObj.botManagement;
-						const botScore = botM.score;
+						const botScore = botM?.score;
 						if (botScore < 30) {
 							resp = await await fetch('https://k8s.benjamintran.com');
 						} else {
-							resp = await fetch(request);
+							resp = await fetch('https://www.benjamintran.com');
 						}
 						break;
 					default:
@@ -87,20 +89,26 @@ async function handlerProfileEndpoint(req: Request, env: Env): Promise<Response>
 		const err = new Error(`Unable to fetch auth token for UserID: ${userId}`);
 		resp = new Response(err.message, { status: 404 });
 	}
+	console.log(`Auth-Token: ${authToken}`);
 	const newReq = new Request('https://benjamintran.com');
-	newReq.headers.set('Auth-Token', <string>authToken);
+	newReq.headers.set('Auth-Token', authToken as string);
 
 	// Base64 token
-	const base64Token = btoa(<string>authToken);
+	const base64Token = btoa(authToken as string);
 	newReq.headers.set('Auth-Token-Base-64', base64Token);
 
 	// SHA-256
 	const encoder = new TextEncoder();
-	const encodedToken = encoder.encode(<string>authToken);
+	const encodedToken = encoder.encode(authToken as string);
 	const hash = await crypto.subtle.digest({ name: 'SHA-256' }, encodedToken);
-	const intArray = new Uint8Array(hash);
-	const hashString = String.fromCharCode.apply(null, [...intArray]);
-	newReq.headers.set('Auth-Token-SHA-256', hashString);
+	const byteArray = new Uint8Array(hash);
+	// const hashString = String.fromCharCode.apply(null, [...new Uint8Array(hash)]);
+	let hashString = '';
+	for (var i = 0; i < byteArray.byteLength; i++) {
+		hashString += String.fromCodePoint(byteArray[i]);
+	}
+	console.log(`HashString: ${hashString}`);
+	newReq.headers.set('Auth-Token-SHA-256-B64', btoa(hashString));
 
 	resp = await fetch(newReq);
 	return resp;

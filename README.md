@@ -1,3 +1,5 @@
+## Usage
+`curl -X GET -H "UserID: BEN" "https://code-club-3-5-user-profiles.benjamin-tran25.workers.dev/profile"`
 ## Test Users
 ❯ wrangler kv:key put --binding=USER_AUTH "A123" "45hnb"
 ❯ wrangler kv:key put --binding=USER_AUTH "BEN" "e92f463d-67e7-4d2b-a3cd-627d7a2098f8"
