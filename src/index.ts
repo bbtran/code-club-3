@@ -56,7 +56,7 @@ export default {
 						console.log('GET /poems');
 					case 'POST':
 						console.log('POST /poems');
-						resp = await handlePoemsEndpoint(request, env);
+						resp = await handlePoemsEndpoint(request, env, ctx);
 						break;
 					default:
 						break;
@@ -128,18 +128,39 @@ async function handleProfileEndpoint(req: Request, env: Env): Promise<Response> 
 	return resp;
 }
 
-async function handlePoemsEndpoint(req: Request, env: Env): Promise<Response> {
+async function handlePoemsEndpoint(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 	let resp: any = new Response();
-	const newReq = new Request('https://benjamintran.com');
 
-	const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-		prompt: `Write me a poem using using the following country, region, and city. The country is ${req.cf?.country}, the region is ${req.cf?.region}, and the city is ${req.cf?.city}.`,
-		stream: true,
-	});
+	// const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+	// 	prompt: `Write me a poem using using the following country, region, and city. The country is ${req.cf?.country}, the region is ${req.cf?.region}, and the city is ${req.cf?.city}.`,
+	// 	stream: true,
+	// });
 
-	resp = new Response(answer, {
+	let { readable, writable } = new TransformStream();
+	let writer = writable.getWriter();
+	const textEncoder = new TextEncoder();
+
+	const asyncWrite = async () => {
+		const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+			prompt: `Write a poem using the following country, region, and city. The country is ${req.cf?.country}, the region is ${req.cf?.region}, and the city is ${req.cf?.city}.`,
+			stream: true,
+		});
+		const reader = answer.getReader();
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			const chunkString = new TextDecoder().decode(value).slice(6);
+			const chunkJson = JSON.parse(chunkString);
+			await writer.write(textEncoder.encode(chunkJson?.response));
+		}
+		return writer.close();
+	};
+
+	ctx.waitUntil(asyncWrite());
+
+	resp = new Response(readable, {
 		headers: { 'content-type': 'text/event-stream' },
 	});
-	
+
 	return resp;
 }
