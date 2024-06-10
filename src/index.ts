@@ -83,11 +83,17 @@ function getRandomIntString(max: number): string {
 
 async function handlerProfileEndpoint(req: Request, env: Env): Promise<Response> {
 	const userId = req.headers.get('UserID') || '';
-	const authToken = await env.USER_AUTH.get(userId);
 	let resp: any = new Response();
+	if (!userId) {
+		const err = new Error(`Unable to fetch auth token. User ID is required`);
+		resp = new Response(err.message, { status: 404 });
+		return resp;
+	}
+	const authToken = await env.USER_AUTH.get(userId);
 	if (!authToken) {
 		const err = new Error(`Unable to fetch auth token for UserID: ${userId}`);
 		resp = new Response(err.message, { status: 404 });
+		return resp;
 	}
 	console.log(`Auth-Token: ${authToken}`);
 	const newReq = new Request('https://benjamintran.com');
