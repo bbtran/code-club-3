@@ -21,8 +21,6 @@ interface Env {
 	//
 	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
 	// MY_BUCKET: R2Bucket;
-
-	AI: any; // TBD: Workers AI Type
 }
 
 export default {
@@ -44,19 +42,7 @@ export default {
 					case 'POST':
 						console.log('POST /profile');
 						console.log('Currently both GET and POST have the same response handler.');
-						resp = await handleProfileEndpoint(request, env);
-						break;
-					default:
-						break;
-				}
-				break;
-			case '/poems':
-				switch (request.method) {
-					case 'GET':
-						console.log('GET /poems');
-					case 'POST':
-						console.log('POST /poems');
-						resp = await handlePoemsEndpoint(request, env, ctx);
+						resp = await handlerProfileEndpoint(request, env);
 						break;
 					default:
 						break;
@@ -95,13 +81,19 @@ function getRandomIntString(max: number): string {
 	return Math.floor(Math.random() * max).toString();
 }
 
-async function handleProfileEndpoint(req: Request, env: Env): Promise<Response> {
+async function handlerProfileEndpoint(req: Request, env: Env): Promise<Response> {
 	const userId = req.headers.get('UserID') || '';
-	const authToken = await env.USER_AUTH.get(userId);
 	let resp: any = new Response();
+	if (!userId) {
+		const err = new Error(`Unable to fetch auth token. User ID is required`);
+		resp = new Response(err.message, { status: 404 });
+		return resp;
+	}
+	const authToken = await env.USER_AUTH.get(userId);
 	if (!authToken) {
 		const err = new Error(`Unable to fetch auth token for UserID: ${userId}`);
 		resp = new Response(err.message, { status: 404 });
+		return resp;
 	}
 	console.log(`Auth-Token: ${authToken}`);
 	const newReq = new Request('https://benjamintran.com');
@@ -125,42 +117,5 @@ async function handleProfileEndpoint(req: Request, env: Env): Promise<Response> 
 	newReq.headers.set('Auth-Token-SHA-256-B64', btoa(hashString));
 
 	resp = await fetch(newReq);
-	return resp;
-}
-
-async function handlePoemsEndpoint(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-	let resp: any = new Response();
-
-	// const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-	// 	prompt: `Write me a poem using using the following country, region, and city. The country is ${req.cf?.country}, the region is ${req.cf?.region}, and the city is ${req.cf?.city}.`,
-	// 	stream: true,
-	// });
-
-	let { readable, writable } = new TransformStream();
-	let writer = writable.getWriter();
-	const textEncoder = new TextEncoder();
-
-	const asyncWrite = async () => {
-		const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-			prompt: `Write a poem using the following country, region, and city. The country is ${req.cf?.country}, the region is ${req.cf?.region}, and the city is ${req.cf?.city}.`,
-			stream: true,
-		});
-		const reader = answer.getReader();
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			const chunkString = new TextDecoder().decode(value).slice(6);
-			const chunkJson = JSON.parse(chunkString);
-			await writer.write(textEncoder.encode(chunkJson?.response));
-		}
-		return writer.close();
-	};
-
-	ctx.waitUntil(asyncWrite());
-
-	resp = new Response(readable, {
-		headers: { 'content-type': 'text/event-stream' },
-	});
-
 	return resp;
 }
